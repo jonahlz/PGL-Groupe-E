@@ -1,0 +1,22 @@
+# Maven
+target/
+
+# JavaDoc output (generated; regenerate with mvn javadoc:javadoc)
+docs/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts / saved simulations
+*.class
+*.sim
