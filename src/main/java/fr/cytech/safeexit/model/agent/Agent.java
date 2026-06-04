@@ -41,6 +41,7 @@ public class Agent extends AbstractObservable implements Observer {
     private Node currentNode;
     private Edge currentEdge;
     private double progressOnEdge;
+    private Node edgeDestination;
 
     // Kinematics
     private double maxSpeed;
@@ -272,6 +273,24 @@ public class Agent extends AbstractObservable implements Observer {
      */
     public void setCurrentEdge(Edge currentEdge) {
         this.currentEdge = currentEdge;
+    }
+
+    /**
+     * Returns the node the agent is heading to while travelling on an edge.
+     *
+     * @return the edge destination node, or {@code null} if on a node
+     */
+    public Node getEdgeDestination() {
+        return edgeDestination;
+    }
+
+    /**
+     * Sets the node the agent is heading to while travelling on an edge.
+     *
+     * @param edgeDestination the destination node
+     */
+    public void setEdgeDestination(Node edgeDestination) {
+        this.edgeDestination = edgeDestination;
     }
 
     /**
