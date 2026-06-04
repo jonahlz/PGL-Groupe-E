@@ -41,9 +41,8 @@ public final class Main {
             System.out.println("SafeExit - command-line mode (model self-test)");
             runModelSelfTest();
         } else {
-            System.out.println("SafeExit - graphical mode is not implemented yet.");
-            System.out.println("Run with --cli to exercise the model from the console.");
-            runModelSelfTest();
+            // Graphical mode: launch the JavaFX application.
+            SafeExitApp.main(args);
         }
     }
 
