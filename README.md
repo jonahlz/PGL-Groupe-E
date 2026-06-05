@@ -13,17 +13,37 @@ de secours selon un routage de **Voronoï** (Dijkstra multi-sources) recalculé 
 - **JDK 21** (Eclipse Temurin recommandé)
 - **Maven 3.9+**
 
-## Compiler et lancer
+## Lancer la simulation
+
+### 1. Ouvrir un terminal dans le dossier du projet
+
+Sous Windows : dans l'Explorateur, ouvre le dossier du projet, clique dans la **barre
+d'adresse**, tape `powershell` puis Entrée. Vérifie que l'outillage est prêt :
 
 ```bash
-# Compiler
-mvn compile
+mvn -version    # doit afficher Maven 3.9+ et Java 21
+```
 
-# Lancer l'interface graphique JavaFX (mode évalué)
+> Si `mvn` n'est pas reconnu, ferme le terminal et rouvres-en un **neuf** (pour qu'il prenne
+> en compte le PATH), ou utilise le chemin complet vers `mvn.cmd`.
+
+### 2. Commandes principales
+
+```bash
+# Interface graphique JavaFX (mode évalué) — c'est la commande à utiliser le plus souvent
 mvn javafx:run
 
-# Lancer la version ligne de commande (test du modèle sans JavaFX)
+# Version ligne de commande : la simulation tourne dans la console, sans fenêtre
 mvn compile exec:java -Dexec.mainClass=fr.cytech.safeexit.Main -Dexec.args=--cli
+```
+
+Pour arrêter l'interface graphique : ferme la fenêtre (ou `Ctrl+C` dans le terminal).
+
+### 3. Autres commandes utiles
+
+```bash
+# Compiler sans lancer
+mvn compile
 
 # Générer la JavaDoc dans le dossier /docs
 mvn javadoc:javadoc
