@@ -6,6 +6,9 @@ import fr.cytech.safeexit.model.graph.Graph;
 import fr.cytech.safeexit.model.graph.GraphException;
 import fr.cytech.safeexit.model.graph.Node;
 import fr.cytech.safeexit.model.graph.NodeType;
+import fr.cytech.safeexit.model.sensor.RowSensor;
+import fr.cytech.safeexit.model.sensor.SeatSensor;
+import fr.cytech.safeexit.model.sensor.SensorNetwork;
 import fr.cytech.safeexit.model.simulation.SimulationEngine;
 import fr.cytech.safeexit.model.simulation.SimulationState;
 import fr.cytech.safeexit.model.venue.ConcertHallBuilder;
@@ -38,12 +41,88 @@ public final class Main {
      * @param args command-line arguments; {@code --cli} selects command-line mode
      */
     public static void main(String[] args) {
-        boolean cli = args.length > 0 && "--cli".equalsIgnoreCase(args[0]);
-        if (cli) {
-            runEvacuationDemo();
-        } else {
-            // Graphical mode: launch the JavaFX application.
-            SafeExitApp.main(args);
+        String mode = args.length > 0 ? args[0].toLowerCase() : "";
+        switch (mode) {
+            case "--cli" -> runEvacuationDemo();
+            case "--sensors" -> runSensorDemo();
+            default -> SafeExitApp.main(args); // graphical mode
+        }
+    }
+
+    /**
+     * Demonstrates the seat-occupancy sensor layer from the console: it builds a
+     * hall, shows the initial occupancy, simulates a couple of real-life cases
+     * (a spectator goes to the toilets, another changes seats) and then runs the
+     * evacuation, showing the seats being freed in real time.
+     */
+    private static void runSensorDemo() {
+        System.out.println("SafeExit - seat occupancy sensors (command-line test)");
+        try {
+            Graph graph = new ConcertHallBuilder().buildHall(4, 8);
+            SimulationState state = new SimulationState(graph);
+            int created = 0;
+            for (Node node : graph.getNodes()) {
+                if (node.getType() == NodeType.SEAT) {
+                    Agent agent = new Agent(String.format("AGT_%03d", ++created), node);
+                    node.incrementAgentCount();
+                    state.getAgents().add(agent);
+                }
+            }
+
+            // Build and attach the sensor layer.
+            SensorNetwork sensors = SensorNetwork.build(graph, state.getAgents());
+            state.setSensorNetwork(sensors);
+
+            System.out.printf("%nInitial occupancy: %d / %d seats occupied%n",
+                    sensors.totalOccupied(), sensors.totalSeats());
+            printRowOccupancy(sensors);
+
+            // Case: a spectator goes to the toilets (seat stays reserved).
+            Agent a0 = state.getAgents().get(0);
+            SeatSensor s0 = sensors.getSensor(a0.getCurrentNode());
+            s0.markAway();
+            System.out.printf("%nCas 'toilettes' : %s -> %s (siège réservé)%n",
+                    s0.getSeat().getId(), s0.getStatus());
+            System.out.printf("Occupancy now: %d / %d%n",
+                    sensors.totalOccupied(), sensors.totalSeats());
+
+            // Then the spectator comes back to their seat.
+            s0.markOccupied(a0);
+            System.out.printf("Retour à sa place : %s -> %s%n",
+                    s0.getSeat().getId(), s0.getStatus());
+            System.out.printf("Occupancy now: %d / %d%n",
+                    sensors.totalOccupied(), sensors.totalSeats());
+
+            // Run the evacuation: seats are freed live as occupants leave.
+            System.out.println("\nÉvacuation — les sièges se libèrent en temps réel :");
+            SimulationEngine engine = new SimulationEngine(state);
+            int total = state.getAgents().size();
+            int cycle = 0;
+            while (cycle < 5000 && !engine.isEvacuationComplete()) {
+                engine.tick();
+                cycle++;
+                if (cycle % 20 == 0) {
+                    System.out.printf("  cycle %4d : %d sièges encore occupés, %d évacués%n",
+                            cycle, sensors.totalOccupied(), engine.countEvacuated());
+                }
+            }
+            System.out.printf("%nTerminé en %d cycles : %d sièges occupés, %d / %d évacués.%n",
+                    cycle, sensors.totalOccupied(), engine.countEvacuated(), total);
+        } catch (GraphException e) {
+            System.err.println("Sensor demo failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Prints the occupancy of each row from the sensor network.
+     *
+     * @param sensors the sensor network
+     */
+    private static void printRowOccupancy(SensorNetwork sensors) {
+        for (RowSensor row : sensors.getRowSensors()) {
+            System.out.printf("  Rangée %-2s : %d / %d occupés (%.0f%%)%n",
+                    row.getRowId(), row.occupiedCount(), row.seatCount(),
+                    row.occupancyRatio() * 100);
         }
     }
 

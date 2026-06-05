@@ -9,6 +9,11 @@ import fr.cytech.safeexit.model.observer.AbstractObservable;
 import fr.cytech.safeexit.model.observer.Observer;
 import fr.cytech.safeexit.model.observer.SimulationEvent;
 import fr.cytech.safeexit.model.routing.VoronoiEvacuationRouter;
+import fr.cytech.safeexit.model.sensor.SeatSensor;
+import fr.cytech.safeexit.model.sensor.SensorNetwork;
+
+import java.util.List;
+import java.util.Random;
 
 /**
  * Drives the simulation one cycle at a time.
@@ -35,6 +40,8 @@ public class SimulationEngine extends AbstractObservable implements Observer {
 
     private boolean paused;
     private boolean routesDirty;
+    private EventPhase phase = EventPhase.NORMAL;
+    private final Random random = new Random();
 
     /**
      * Creates an engine for the given simulation state and computes the initial
@@ -92,11 +99,74 @@ public class SimulationEngine extends AbstractObservable implements Observer {
         if (routesDirty) {
             recomputeRoutes();
         }
-        for (Agent agent : state.getAgents()) {
-            stepAgent(agent);
+        if (phase == EventPhase.NORMAL) {
+            // Event in progress: only monitor the venue (ambient occupancy changes).
+            ambientTick();
+        } else {
+            // Emergency: move every agent toward the exits.
+            for (Agent agent : state.getAgents()) {
+                stepAgent(agent);
+            }
         }
         checkDensityAlerts();
         state.incrementCycle();
+    }
+
+    /**
+     * Simulates the living venue during the {@link EventPhase#NORMAL} phase:
+     * once in a while a seated spectator leaves their seat (toilets...) and
+     * another comes back, so the supervisor sees occupancy change in real time.
+     */
+    private void ambientTick() {
+        SensorNetwork network = state.getSensorNetwork();
+        if (network == null || state.getCurrentCycle() % 4 != 0) {
+            return;
+        }
+        List<SeatSensor> sensors = network.getSeatSensors();
+        if (sensors.isEmpty()) {
+            return;
+        }
+        // One spectator leaves their seat for a moment.
+        SeatSensor leaving = sensors.get(random.nextInt(sensors.size()));
+        if (leaving.isOccupied()) {
+            leaving.markAway();
+        }
+        // One spectator returns to their seat.
+        SeatSensor returning = sensors.get(random.nextInt(sensors.size()));
+        if (returning.getStatus() == fr.cytech.safeexit.model.sensor.SeatStatus.AWAY) {
+            returning.markOccupied(returning.getOccupant());
+        }
+    }
+
+    /**
+     * Triggers the emergency evacuation: switches to the evacuation phase and
+     * notifies observers. Seated spectators (even those marked away) now head
+     * for the exits.
+     */
+    public void triggerEvacuation() {
+        if (phase == EventPhase.EVACUATION) {
+            return;
+        }
+        phase = EventPhase.EVACUATION;
+        notifyObservers(new SimulationEvent(SimulationEvent.Type.EVACUATION_TRIGGERED, this));
+    }
+
+    /**
+     * Returns the current event phase.
+     *
+     * @return the phase
+     */
+    public EventPhase getPhase() {
+        return phase;
+    }
+
+    /**
+     * Indicates whether an evacuation is in progress.
+     *
+     * @return {@code true} if the phase is {@link EventPhase#EVACUATION}
+     */
+    public boolean isEvacuating() {
+        return phase == EventPhase.EVACUATION;
     }
 
     /**
@@ -150,6 +220,11 @@ public class SimulationEngine extends AbstractObservable implements Observer {
      */
     private void enterEdge(Agent agent, Node from, Edge edge, Node toNode) {
         from.decrementAgentCount();
+        // Free the seat sensor in real time when its occupant leaves.
+        if (from.getType() == fr.cytech.safeexit.model.graph.NodeType.SEAT
+                && state.getSensorNetwork() != null) {
+            state.getSensorNetwork().onAgentLeftSeat(from);
+        }
         edge.onAgentEnter();
         agent.setCurrentNode(null);
         agent.setCurrentEdge(edge);
