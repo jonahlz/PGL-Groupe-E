@@ -39,7 +39,11 @@ public class SimulationEvent implements Serializable {
         /** Emergency evacuation mode was triggered. */
         EVACUATION_TRIGGERED,
         /** Voronoi routes were recomputed after an obstacle appeared. */
-        ROUTE_RECALCULATED
+        ROUTE_RECALCULATED,
+        /** A seat sensor changed status (occupied, free, away, moved). */
+        SEAT_STATE_CHANGED,
+        /** A row's overall occupancy changed. */
+        ROW_OCCUPANCY_CHANGED
     }
 
     private final Type type;

@@ -3,6 +3,7 @@ package fr.cytech.safeexit.model.simulation;
 import fr.cytech.safeexit.model.agent.Agent;
 import fr.cytech.safeexit.model.graph.Graph;
 import fr.cytech.safeexit.model.graph.Node;
+import fr.cytech.safeexit.model.sensor.SensorNetwork;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -37,6 +38,9 @@ public class SimulationState implements Serializable {
 
     /** For each node, the exit it is currently assigned to (Voronoi cell). */
     private final Map<Node, Node> assignedExit;
+
+    /** Optional occupancy-sensor layer (may be {@code null}). */
+    private SensorNetwork sensorNetwork;
 
     /** Number of simulation cycles elapsed since the start. */
     private long currentCycle;
@@ -110,6 +114,24 @@ public class SimulationState implements Serializable {
         if (exitOf != null) {
             assignedExit.putAll(exitOf);
         }
+    }
+
+    /**
+     * Returns the occupancy-sensor layer, if any.
+     *
+     * @return the sensor network, or {@code null}
+     */
+    public SensorNetwork getSensorNetwork() {
+        return sensorNetwork;
+    }
+
+    /**
+     * Attaches an occupancy-sensor layer to this state.
+     *
+     * @param sensorNetwork the sensor network
+     */
+    public void setSensorNetwork(SensorNetwork sensorNetwork) {
+        this.sensorNetwork = sensorNetwork;
     }
 
     /**
