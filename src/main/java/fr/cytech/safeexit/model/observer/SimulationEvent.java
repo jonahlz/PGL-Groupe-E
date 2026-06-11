@@ -43,7 +43,11 @@ public class SimulationEvent implements Serializable {
         /** A seat sensor changed status (occupied, free, away, moved). */
         SEAT_STATE_CHANGED,
         /** A row's overall occupancy changed. */
-        ROW_OCCUPANCY_CHANGED
+        ROW_OCCUPANCY_CHANGED,
+        /** A sector display panel changed mode or message. */
+        PANEL_MODE_CHANGED,
+        /** A sector's occupancy went above its congestion threshold. */
+        SECTOR_CONGESTION_ALERT
     }
 
     private final Type type;

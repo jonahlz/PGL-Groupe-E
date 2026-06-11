@@ -4,6 +4,7 @@ import fr.cytech.safeexit.model.agent.Agent;
 import fr.cytech.safeexit.model.graph.Graph;
 import fr.cytech.safeexit.model.graph.Node;
 import fr.cytech.safeexit.model.sensor.SensorNetwork;
+import fr.cytech.safeexit.model.sector.SectorManager;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ public class SimulationState implements Serializable {
 
     /** Optional occupancy-sensor layer (may be {@code null}). */
     private SensorNetwork sensorNetwork;
+
+    /** Optional sector / display-panel layer built on top of the sensors (may be {@code null}). */
+    private SectorManager sectorManager;
 
     /** Number of simulation cycles elapsed since the start. */
     private long currentCycle;
@@ -132,6 +136,24 @@ public class SimulationState implements Serializable {
      */
     public void setSensorNetwork(SensorNetwork sensorNetwork) {
         this.sensorNetwork = sensorNetwork;
+    }
+
+    /**
+     * Returns the sector / display-panel layer, if any.
+     *
+     * @return the sector manager, or {@code null}
+     */
+    public SectorManager getSectorManager() {
+        return sectorManager;
+    }
+
+    /**
+     * Attaches a sector / display-panel layer to this state.
+     *
+     * @param sectorManager the sector manager
+     */
+    public void setSectorManager(SectorManager sectorManager) {
+        this.sectorManager = sectorManager;
     }
 
     /**

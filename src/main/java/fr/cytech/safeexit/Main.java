@@ -73,6 +73,18 @@ public final class Main {
             SensorNetwork sensors = SensorNetwork.build(graph, state.getAgents());
             state.setSensorNetwork(sensors);
 
+            // Build the sector / display-panel layer on top of the sensors and
+            // show it in the console (proves the centralised system runs without JavaFX).
+            fr.cytech.safeexit.model.sector.SectorManager sectorManager =
+                    fr.cytech.safeexit.model.sector.SectorManager.build(sensors, graph);
+            state.setSectorManager(sectorManager);
+            System.out.printf("%nSectors created: %d (%d rows per sector)%n",
+                    sectorManager.sectorCount(),
+                    fr.cytech.safeexit.model.sector.SectorManager.DEFAULT_ROWS_PER_SECTOR);
+            for (fr.cytech.safeexit.model.sector.Sector sector : sectorManager.getSectors()) {
+                System.out.println("  " + sector);
+            }
+
             System.out.printf("%nInitial occupancy: %d / %d seats occupied%n",
                     sensors.totalOccupied(), sensors.totalSeats());
             printRowOccupancy(sensors);

@@ -328,6 +328,10 @@ public class SafeExitApp extends Application {
             // Build the seat-occupancy sensor layer and attach it to the state.
             state.setSensorNetwork(SensorNetwork.build(state.getGraph(), state.getAgents()));
 
+            // Build the sector / display-panel layer on top of the sensors.
+            state.setSectorManager(fr.cytech.safeexit.model.sector.SectorManager.build(
+                    state.getSensorNetwork(), state.getGraph()));
+
             SimulationEngine engine = new SimulationEngine(state);
             simulation = new SimulationController(engine);
             simulation.setOnTick(this::onTick);
