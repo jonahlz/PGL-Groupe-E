@@ -16,7 +16,7 @@
 
 **SafeExit** est une application **Java 21 / JavaFX** de **simulation et de supervision d'une évacuation d'urgence** dans une salle de concert, modélisée comme un **graphe 2D** (nœuds = sièges, allées, couloirs, sorties ; arêtes = chemins avec une capacité limitée). Le routage d'évacuation utilise un algorithme de **Voronoï / Dijkstra multi-sources** recalculé en temps réel.
 
-**[À COMPLÉTER : 2-3 phrases sur votre contexte Éthique/Design — pourquoi la sécurité d'évacuation, pour qui, etc.]**
+Notre travail en **Éthique** porte sur la **sécurité des personnes lors d'événements de grande affluence** : comment évacuer une foule rapidement et équitablement, sans créer de mouvement de panique ni laisser de zone livrée à elle-même. Le périmètre **Design** vise un **poste de supervision clair et non anxiogène** destiné à un opérateur de salle : visualisation de l'occupation en temps réel, alertes lisibles par secteur et actions simples et sûres (bloquer une sortie, déclencher une évacuation). SafeExit est la traduction logicielle de ce poste de supervision.
 
 ## 2. Contexte et périmètre (pivot v2)
 
@@ -83,8 +83,7 @@ Voir le [diagramme de classes](CONCEPTION_UML.md) pour le détail des relations.
 - À l'évacuation, les panneaux passent en **GUIDAGE** vers la sortie assignée par le Voronoï.
 
 ### Écartées volontairement (et justification)
-Conformément à la clause d'adaptation au périmètre et à la priorité « stabilité > exhaustivité », nous avons **écarté l'édition générique du graphe** (ajout/déplacement/suppression libres de nœuds, d'arêtes et d'agents, ajout de masse aléatoire). Dans notre contexte — une **salle de concert réelle au plan fixe** — ces actions n'ont pas de sens métier ; nous proposons à la place des **interactions ciblées** (bloquer une sortie, paniquer un secteur) cohérentes avec un poste de supervision.
-**[À COMPLÉTER : confirmez/affinez cette justification avec ce que vous avez décidé avec la tutrice.]**
+Conformément à la clause d'adaptation au périmètre et à la priorité « stabilité > exhaustivité », nous avons **écarté l'édition générique du graphe** (ajout/déplacement/suppression libres de nœuds, d'arêtes et d'agents, ajout de masse aléatoire). Dans notre contexte — une **salle de concert réelle au plan fixe** — ces actions n'ont pas de sens métier ; nous proposons à la place des **interactions ciblées** (bloquer une sortie, paniquer/calmer un secteur) cohérentes avec un poste de supervision. Ce recentrage (pivot v2) a été décidé après retour de notre tutrice, qui nous a orientés vers un système centralisé et physique plutôt qu'un guidage individuel par smartphone.
 
 ## 6. Problèmes rencontrés et solutions
 
@@ -94,18 +93,29 @@ Conformément à la clause d'adaptation au périmètre et à la priorité « sta
 - **Fausses alertes de congestion.** Une salle pleine mais **assise** déclenchait l'alerte « zone dense ». Nous avons remplacé le critère « taux de sièges occupés » par un **taux de mouvement** (spectateurs hors de leur siège) : au repos l'alerte est nulle, elle ne monte que lors d'un vrai mouvement de foule ou d'une panique.
 - **Panneaux incohérents pendant l'évacuation.** Les panneaux revenaient au message « Bienvenue » à mesure que la salle se vidait. Solution : à l'évacuation, on **coupe la surveillance de congestion** et on diffuse un message de **GUIDAGE** vers la sortie assignée.
 - **Affichage trop zoomé.** Le canvas dessinait à l'échelle 1:1 ancrée à l'origine. Ajout d'un **zoom-to-fit** (`GraphCanvas.fitToView`) et d'une fenêtre **maximisée** + barre de contrôle **adaptative** (`FlowPane`).
-- **[À COMPLÉTER : un problème d'équipe (merge Git, répartition, etc.) et sa résolution.]**
+- **Conflits Git sur les fichiers centraux.** Le moteur (`SimulationEngine`) étant modifié par plusieurs personnes en parallèle, nous avons connu des conflits de fusion récurrents. Nous les avons limités en **répartissant les responsabilités par package** et en intégrant plus souvent (commits courts et fréquents, points d'intégration réguliers sur `main`).
 
 ## 7. Résultats et validation
 
-Le modèle a été validé **indépendamment de l'interface** via des démos en ligne de commande (occupation, transitions normal→évacuation sans compteur négatif, round-trip de sérialisation, réaction des panneaux à la panique et à l'évacuation). L'application graphique s'exécute via `mvn javafx:run` et permet de dérouler un scénario complet (normal → promenade/sortie → panique → évacuation → sauvegarde/chargement).
+Le modèle a été validé **indépendamment de l'interface** via des démos en ligne de commande. Exemple (`--cli`, salle 6×10, sortie S4 bloquée) : **évacuation complète en 31 cycles pour 60 agents**, sans compteur d'occupation négatif, avec **1146 positions enregistrées** par le suivi de déplacements. Le round-trip de sérialisation restitue à l'identique le nombre d'agents, l'occupation, le cycle et les secteurs (aucune exception). L'application graphique s'exécute via `mvn javafx:run` et permet de dérouler un scénario complet : normal → promenade/sortie par une issue → panique d'un secteur → évacuation (panneaux en guidage) → sauvegarde/chargement.
 
-**[À COMPLÉTER : capture(s) d'écran, métriques de votre dernière démo.]**
+*(Des captures d'écran du tableau de bord peuvent être ajoutées ici pour la version imprimée.)*
 
 ## 8. Organisation de l'équipe et flux de travail
 
-- Dépôt Git centralisé, **≥ 1 commit par jour**.
-- **[À COMPLÉTER : répartition des tâches par personne, outils (Discord/Trello…), rythme des points avec la tutrice.]**
+- Dépôt Git centralisé sur GitHub, **≥ 1 commit par jour**, intégration continue sur `main`.
+- Communication d'équipe sur Discord et points d'avancement réguliers avec la tutrice.
+- Répartition des responsabilités principales par module :
+
+| Membre | Responsabilités principales |
+|---|---|
+| ZAAID Nassim | Modèle du graphe (`graph/`) et construction de la salle (`venue/`) |
+| EL DANA Aida | Couche capteurs et secteurs (`sensor/`, `sector/`) |
+| HOPPER Kelyan | Routage Voronoï (`routing/`) et moteur de simulation (`simulation/`) |
+| LENZ Jonah | Interface JavaFX (`view/`, `SafeExitApp`) et contrôleurs (`controller/`) |
+| KETTE Sidney | Agents et stratégies (`agent/`), suivi des déplacements (`tracking/`), sérialisation |
+
+> *Le travail étant collaboratif, ces responsabilités indiquent les contributions principales ; chaque membre est intervenu sur plusieurs modules.*
 
 ## 9. Compiler et lancer le projet
 
