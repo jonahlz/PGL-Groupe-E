@@ -67,6 +67,16 @@
                 <version>3.2.5</version>
             </plugin>
 
+            <!-- Run from the command line via exec:java (see README for the CLI flags) -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>${main.class}</mainClass>
+                </configuration>
+            </plugin>
+
             <!-- Generate JavaDoc into /docs : mvn javadoc:javadoc -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
