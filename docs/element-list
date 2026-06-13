@@ -1,0 +1,13 @@
+fr.cytech.safeexit
+fr.cytech.safeexit.controller
+fr.cytech.safeexit.model.agent
+fr.cytech.safeexit.model.graph
+fr.cytech.safeexit.model.observer
+fr.cytech.safeexit.model.routing
+fr.cytech.safeexit.model.sector
+fr.cytech.safeexit.model.sensor
+fr.cytech.safeexit.model.simulation
+fr.cytech.safeexit.model.tracking
+fr.cytech.safeexit.model.venue
+fr.cytech.safeexit.view.dashboard
+fr.cytech.safeexit.view.graph

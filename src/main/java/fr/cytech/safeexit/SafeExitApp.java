@@ -6,28 +6,38 @@ import fr.cytech.safeexit.controller.VenueController;
 import fr.cytech.safeexit.model.graph.Edge;
 import fr.cytech.safeexit.model.graph.GraphException;
 import fr.cytech.safeexit.model.graph.Node;
+import fr.cytech.safeexit.model.sector.Sector;
 import fr.cytech.safeexit.model.sensor.RowSensor;
 import fr.cytech.safeexit.model.sensor.SensorNetwork;
 import fr.cytech.safeexit.model.simulation.SimulationEngine;
 import fr.cytech.safeexit.model.simulation.SimulationState;
+import fr.cytech.safeexit.model.simulation.SimulationSerializer;
 import fr.cytech.safeexit.view.dashboard.AlertPanel;
+import fr.cytech.safeexit.view.dashboard.SectorPanelBoard;
 import fr.cytech.safeexit.view.graph.GraphCanvas;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,12 +71,15 @@ public class SafeExitApp extends Application {
     private static final String TEXT_SEC = "#aab2cc";
 
     private final VenueController venueController = new VenueController();
+    private Stage stage;
     private GraphCanvas canvas;
     private SimulationController simulation;
     private GraphController graphController;
     private SimulationState state;
     private AlertPanel alertPanel;
+    private SectorPanelBoard sectorBoard;
     private Slider speedSlider;
+    private ComboBox<String> panicSectorBox;
 
     // Header phase badge
     private Label phaseBadge;
@@ -90,6 +103,7 @@ public class SafeExitApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        this.stage = stage;
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: " + BG + ";");
 
@@ -106,9 +120,17 @@ public class SafeExitApp extends Application {
 
         setupSimulation();
 
-        Scene scene = new Scene(root, 1280, 800);
+        // Size the window to the screen's work area (capped), and open maximized so
+        // the whole dashboard is visible whatever the resolution / display scaling.
+        javafx.geometry.Rectangle2D visual = javafx.stage.Screen.getPrimary().getVisualBounds();
+        double w = Math.min(1280, visual.getWidth());
+        double h = Math.min(800, visual.getHeight());
+        Scene scene = new Scene(root, w, h);
         stage.setTitle("SafeExit — Supervision");
         stage.setScene(scene);
+        stage.setMinWidth(900);
+        stage.setMinHeight(600);
+        stage.setMaximized(true);
         stage.show();
     }
 
@@ -168,11 +190,13 @@ public class SafeExitApp extends Application {
     }
 
     /**
-     * Builds the right column: exit controls on top, alert log below.
+     * Builds the right column: exit controls, sector panels, row occupancy and
+     * the alert log. It is wrapped in a scroll pane so that, on a short screen,
+     * the column scrolls instead of pushing the bottom control bar off-screen.
      *
      * @return the right node
      */
-    private VBox buildRightPanel() {
+    private Region buildRightPanel() {
         Label exitHeader = new Label("Contrôle des sorties");
         exitHeader.setStyle("-fx-text-fill: " + TEXT_SEC + "; -fx-font-weight: bold; -fx-padding: 6;");
         exitRows = new VBox(6);
@@ -187,11 +211,21 @@ public class SafeExitApp extends Application {
         VBox occPanel = new VBox(occHeader, occupancyRows);
         occPanel.setStyle("-fx-background-color: " + PANEL + "; -fx-background-radius: 8;");
 
+        sectorBoard = new SectorPanelBoard();
+
         VBox.setVgrow(alertPanel, Priority.ALWAYS);
-        VBox right = new VBox(8, exitPanel, occPanel, alertPanel);
+        VBox right = new VBox(8, exitPanel, sectorBoard, occPanel, alertPanel);
         right.setPadding(new Insets(0, 8, 8, 0));
         right.setPrefWidth(270);
-        return right;
+
+        ScrollPane scroll = new ScrollPane(right);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setMinHeight(0);
+        scroll.setPrefViewportWidth(286);
+        scroll.setStyle("-fx-background: " + BG + "; -fx-background-color: " + BG + ";");
+        return scroll;
     }
 
     /**
@@ -251,25 +285,40 @@ public class SafeExitApp extends Application {
     }
 
     /**
-     * Builds the bottom simulation control bar.
+     * Builds the bottom simulation control bar. It wraps onto several lines on a
+     * narrow window so no control is ever cut off.
      *
      * @return the control bar node
      */
-    private HBox buildControlBar() {
+    private FlowPane buildControlBar() {
         Button play = themedButton("▶ Play", GREEN);
         Button pause = themedButton("⏸ Pause", "#394260");
         Button step = themedButton("⏭ Step", "#394260");
         Button reset = themedButton("⏮ Reset", "#394260");
+        Button save = themedButton("💾 Sauvegarder", "#394260");
+        Button load = themedButton("📂 Charger", "#394260");
         Button evac = themedButton("Déclencher évacuation", RED);
 
         play.setOnAction(e -> simulation.play());
         pause.setOnAction(e -> simulation.pause());
         step.setOnAction(e -> simulation.step());
         reset.setOnAction(e -> setupSimulation());
+        save.setOnAction(e -> onSave());
+        load.setOnAction(e -> onLoad());
         evac.setOnAction(e -> {
             simulation.getEngine().triggerEvacuation();
             simulation.play();
         });
+
+        // Manual scenario: trigger panic in a chosen sector.
+        Label sectorLabel = new Label("Secteur");
+        sectorLabel.setStyle("-fx-text-fill: " + TEXT_SEC + ";");
+        panicSectorBox = new ComboBox<>();
+        panicSectorBox.setPromptText("Secteur");
+        Button panic = themedButton("⚠ Paniquer", "#e67e22");
+        panic.setOnAction(e -> onPanicSector());
+        Button calm = themedButton("✓ Calmer", "#394260");
+        calm.setOnAction(e -> onCalmSector());
 
         Label speedLabel = new Label("Vitesse");
         speedLabel.setStyle("-fx-text-fill: " + TEXT_SEC + ";");
@@ -287,12 +336,60 @@ public class SafeExitApp extends Application {
         // Start on the occupancy view (live venue monitoring).
         canvas.setDisplayMode(GraphCanvas.DisplayMode.OCCUPANCY);
 
-        HBox bar = new HBox(8, play, pause, step, reset, evac, speedLabel, speedSlider,
-                modeLabel, modeBox);
+        FlowPane bar = new FlowPane(8, 8, play, pause, step, reset, save, load, evac,
+                sectorLabel, panicSectorBox, panic, calm, speedLabel, speedSlider, modeLabel, modeBox);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(10));
         bar.setStyle("-fx-background-color: " + PANEL + ";");
         return bar;
+    }
+
+    /**
+     * Triggers panic in the sector selected in the control bar (manual scenario).
+     */
+    private void onPanicSector() {
+        if (simulation == null || panicSectorBox == null) {
+            return;
+        }
+        String sectorId = panicSectorBox.getValue();
+        if (sectorId == null) {
+            return;
+        }
+        simulation.getEngine().triggerPanicInSector(sectorId);
+        onTick();
+    }
+
+    /**
+     * Calms the sector selected in the control bar (undoes a panic scenario).
+     */
+    private void onCalmSector() {
+        if (simulation == null || panicSectorBox == null) {
+            return;
+        }
+        String sectorId = panicSectorBox.getValue();
+        if (sectorId == null) {
+            return;
+        }
+        simulation.getEngine().calmSector(sectorId);
+        onTick();
+    }
+
+    /**
+     * Fills the panic-sector selector with the ids of the current sectors.
+     */
+    private void populatePanicSectors() {
+        if (panicSectorBox == null) {
+            return;
+        }
+        panicSectorBox.getItems().clear();
+        if (state.getSectorManager() != null) {
+            for (Sector sector : state.getSectorManager().getSectors()) {
+                panicSectorBox.getItems().add(sector.getSectorId());
+            }
+        }
+        if (!panicSectorBox.getItems().isEmpty()) {
+            panicSectorBox.setValue(panicSectorBox.getItems().get(0));
+        }
     }
 
     /**
@@ -318,49 +415,129 @@ public class SafeExitApp extends Application {
      * and refreshes the view. Used at startup and by the reset button.
      */
     private void setupSimulation() {
-        if (simulation != null) {
-            simulation.pause();
-        }
         try {
-            state = venueController.createHall(ROWS, SEATS_PER_ROW, ROWS * SEATS_PER_ROW);
-            venueController.blockNode(state, "EXIT_S4");
+            SimulationState fresh =
+                    venueController.createHall(ROWS, SEATS_PER_ROW, ROWS * SEATS_PER_ROW);
+            venueController.blockNode(fresh, "EXIT_S4");
 
             // Build the seat-occupancy sensor layer and attach it to the state.
-            state.setSensorNetwork(SensorNetwork.build(state.getGraph(), state.getAgents()));
+            fresh.setSensorNetwork(SensorNetwork.build(fresh.getGraph(), fresh.getAgents()));
 
             // Build the sector / display-panel layer on top of the sensors.
-            state.setSectorManager(fr.cytech.safeexit.model.sector.SectorManager.build(
-                    state.getSensorNetwork(), state.getGraph()));
+            fresh.setSectorManager(fr.cytech.safeexit.model.sector.SectorManager.build(
+                    fresh.getSensorNetwork(), fresh.getGraph()));
 
-            SimulationEngine engine = new SimulationEngine(state);
-            simulation = new SimulationController(engine);
-            simulation.setOnTick(this::onTick);
-            int interval = speedSlider != null
-                    ? (int) (SPEED_BASE - speedSlider.getValue())
-                    : DEFAULT_INTERVAL_MS;
-            simulation.setIntervalMs(interval);
-
-            graphController = new GraphController(engine);
-            graphController.setOnChange(this::onTick);
-            canvas.setOnPick(graphController::toggleBlocked);
-
-            // Wire the alert log as an observer of the engine and of the elements.
-            alertPanel.clear();
-            engine.addObserver(alertPanel);
-            for (Node node : state.getGraph().getNodes()) {
-                node.addObserver(alertPanel);
-            }
-            for (Edge edge : state.getGraph().getEdges()) {
-                edge.addObserver(alertPanel);
-            }
-
-            buildExitControls();
-            buildOccupancyControls();
-            canvas.setModel(state);
-            onTick();
+            installState(fresh);
         } catch (GraphException e) {
             System.err.println("Setup failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Installs a simulation state (freshly built or loaded from disk): creates a
+     * new engine and controllers around it, wires the observers and refreshes the
+     * whole view. Shared by startup, reset and load.
+     *
+     * @param newState the state to drive the dashboard with
+     */
+    private void installState(SimulationState newState) {
+        if (simulation != null) {
+            simulation.pause();
+        }
+        state = newState;
+
+        SimulationEngine engine = new SimulationEngine(state);
+        simulation = new SimulationController(engine);
+        simulation.setOnTick(this::onTick);
+        int interval = speedSlider != null
+                ? (int) (SPEED_BASE - speedSlider.getValue())
+                : DEFAULT_INTERVAL_MS;
+        simulation.setIntervalMs(interval);
+
+        graphController = new GraphController(engine);
+        graphController.setOnChange(this::onTick);
+        canvas.setOnPick(graphController::toggleBlocked);
+
+        // Wire the alert log as an observer of the engine and of the elements.
+        alertPanel.clear();
+        engine.addObserver(alertPanel);
+        for (Node node : state.getGraph().getNodes()) {
+            node.addObserver(alertPanel);
+        }
+        for (Edge edge : state.getGraph().getEdges()) {
+            edge.addObserver(alertPanel);
+        }
+
+        buildExitControls();
+        buildOccupancyControls();
+        sectorBoard.setModel(state.getSectorManager());
+        populatePanicSectors();
+        canvas.setModel(state);
+        onTick();
+    }
+
+    /**
+     * Saves the current simulation to a binary file chosen by the supervisor.
+     */
+    private void onSave() {
+        if (state == null) {
+            return;
+        }
+        if (simulation != null) {
+            simulation.pause();
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Sauvegarder la simulation");
+        chooser.setInitialFileName("simulation" + SimulationSerializer.EXTENSION);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "Simulation SafeExit (*" + SimulationSerializer.EXTENSION + ")",
+                "*" + SimulationSerializer.EXTENSION));
+        File file = chooser.showSaveDialog(stage);
+        if (file == null) {
+            return;
+        }
+        try {
+            SimulationSerializer.save(state, file.toPath());
+        } catch (IOException ex) {
+            showError("Sauvegarde impossible : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Loads a previously saved simulation, replacing the current one.
+     */
+    private void onLoad() {
+        if (simulation != null) {
+            simulation.pause();
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Charger une simulation");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "Simulation SafeExit (*" + SimulationSerializer.EXTENSION + ")",
+                "*" + SimulationSerializer.EXTENSION));
+        File file = chooser.showOpenDialog(stage);
+        if (file == null) {
+            return;
+        }
+        try {
+            SimulationState loaded = SimulationSerializer.load(file.toPath());
+            installState(loaded);
+        } catch (IOException | ClassNotFoundException ex) {
+            showError("Chargement impossible : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Shows a non-blocking error dialog so a failed save / load never crashes the
+     * application.
+     *
+     * @param message the message to display
+     */
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        alert.setTitle("SafeExit");
+        alert.setHeaderText(null);
+        alert.showAndWait();
     }
 
     /**
@@ -409,6 +586,9 @@ public class SafeExitApp extends Application {
         updateMetrics();
         refreshExitButtons();
         refreshOccupancy();
+        if (sectorBoard != null) {
+            sectorBoard.refresh();
+        }
     }
 
     /**

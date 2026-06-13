@@ -1,8 +1,8 @@
 # Maven
 target/
 
-# JavaDoc output (generated; regenerate with mvn javadoc:javadoc)
-docs/
+# Note: the generated JavaDoc in docs/ IS committed (required deliverable).
+# Regenerate it with: mvn javadoc:javadoc
 
 # IDEs
 .idea/

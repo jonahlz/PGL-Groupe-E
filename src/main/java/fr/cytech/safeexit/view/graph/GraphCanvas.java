@@ -65,6 +65,8 @@ public class GraphCanvas extends Pane {
     private double lastMouseX;
     private double lastMouseY;
     private boolean dragged;
+    /** When true, the next redraw frames the whole graph to fit the canvas. */
+    private boolean needsFit = true;
 
     // Called with the picked Node or Edge when the user clicks an element.
     private java.util.function.Consumer<Object> onPick;
@@ -122,7 +124,49 @@ public class GraphCanvas extends Pane {
      */
     public void setModel(SimulationState state) {
         this.state = state;
+        this.needsFit = true;
         redraw();
+    }
+
+    /**
+     * Requests that the next redraw re-frame the whole graph to fit the canvas.
+     * Useful for a "fit / reset view" button.
+     */
+    public void resetView() {
+        this.needsFit = true;
+        redraw();
+    }
+
+    /**
+     * Frames the whole graph inside the visible canvas (zoom-to-fit), so the hall
+     * is fully visible whatever the window or screen size. The user can still zoom
+     * (wheel) and pan (drag) afterwards. Does nothing until the canvas has a size.
+     *
+     * @param graph the graph to frame
+     */
+    private void fitToView(Graph graph) {
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        for (Node node : graph.getNodes()) {
+            minX = Math.min(minX, node.getX());
+            minY = Math.min(minY, node.getY());
+            maxX = Math.max(maxX, node.getX());
+            maxY = Math.max(maxY, node.getY());
+        }
+        if (minX > maxX || minY > maxY) {
+            return; // no nodes to frame yet
+        }
+        double pad = 48;
+        double worldW = Math.max(1, maxX - minX);
+        double worldH = Math.max(1, maxY - minY);
+        double availW = Math.max(1, canvas.getWidth() - 2 * pad);
+        double availH = Math.max(1, canvas.getHeight() - 2 * pad);
+        scale = Math.max(0.3, Math.min(4.0, Math.min(availW / worldW, availH / worldH)));
+        offsetX = pad + (availW - worldW * scale) / 2 - minX * scale;
+        offsetY = pad + (availH - worldH * scale) / 2 - minY * scale;
+        needsFit = false;
     }
 
     /**
@@ -169,6 +213,9 @@ public class GraphCanvas extends Pane {
         Graph graph = graph();
         if (graph == null) {
             return;
+        }
+        if (needsFit && canvas.getWidth() > 0 && canvas.getHeight() > 0) {
+            fitToView(graph);
         }
         drawEdges(g, graph);
         if (mode == DisplayMode.EXIT_ZONES && showFlow) {

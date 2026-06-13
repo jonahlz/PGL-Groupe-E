@@ -178,6 +178,9 @@ public final class Main {
             System.out.printf("Exits available: %d (S4 blocked)%n", graph.getExits().size() - 1);
             System.out.printf("Agents to evacuate: %d%n%n", total);
 
+            // Start the emergency: without this the phase stays NORMAL and no one moves.
+            engine.triggerEvacuation();
+
             int maxCycles = 5000;
             int cycle = 0;
             while (cycle < maxCycles && !engine.isEvacuationComplete()) {
@@ -196,6 +199,16 @@ public final class Main {
             } else {
                 System.out.printf("Stopped after %d cycles: %d / %d evacuated.%n",
                         cycle, engine.countEvacuated(), total);
+            }
+
+            // Movement-tracking summary (Sprint 2): the AgentTracker recorded every move.
+            var tracker = state.getAgentTracker();
+            var busiest = tracker.mostCongestedNode();
+            System.out.printf("%nAgentTracker: %d agents tracked, %d positions recorded.%n",
+                    tracker.getTrackedAgentIds().size(), tracker.getTotalRecords());
+            if (busiest != null) {
+                System.out.printf("Most congested node: %s (%d passages).%n",
+                        busiest.getId(), tracker.buildPassageHeatmap().get(busiest));
             }
         } catch (GraphException e) {
             System.err.println("Simulation failed: " + e.getMessage());

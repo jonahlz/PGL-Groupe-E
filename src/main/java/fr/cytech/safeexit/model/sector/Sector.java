@@ -13,11 +13,14 @@ import java.util.List;
  * A sector groups several consecutive seat rows under a single display panel.
  * <p>
  * It is the heart of the centralised system: it <b>observes</b> its
- * {@link RowSensor}s and, whenever the occupancy of one of them changes, it
- * recomputes its own occupancy. When congestion goes above
- * {@code congestionThreshold} it puts its {@link DisplayPanel} into
- * {@link PanelMode#ALERT} and fires a {@code SECTOR_CONGESTION_ALERT} event for
- * the supervisor; when it clears, the panel returns to standby.
+ * {@link RowSensor}s and, whenever one of them changes, it recomputes how many
+ * of its spectators are currently out of their seats. A full but seated audience
+ * is calm, so the alert is driven by <em>movement</em>, not by seat occupancy:
+ * when too many spectators are up and moving in the aisles at once (the real
+ * congestion signal) it puts its {@link DisplayPanel} into {@link PanelMode#ALERT}
+ * and fires a {@code SECTOR_CONGESTION_ALERT} event for the supervisor; when it
+ * clears, the panel returns to standby. A manual panic scenario can also raise
+ * the alert directly.
  * <p>
  * Monitoring can be switched off (see {@link #setMonitoring(boolean)}) so that
  * an ongoing evacuation message is not overwritten by congestion handling.
@@ -29,8 +32,13 @@ public class Sector extends AbstractObservable implements Observer {
 
     private static final long serialVersionUID = 1L;
 
-    /** Default occupancy ratio (0..1) above which the sector raises an alert. */
-    public static final double DEFAULT_CONGESTION_THRESHOLD = 0.75;
+    /**
+     * Default movement ratio (0..1) above which the sector raises an alert, i.e.
+     * the fraction of the sector's spectators that must be out of their seats at
+     * once to count as real congestion. A calm, fully seated audience has a
+     * movement ratio of 0, so it never triggers a false alarm.
+     */
+    public static final double DEFAULT_CONGESTION_THRESHOLD = 0.40;
 
     private final String sectorId;
     private final List<RowSensor> rowSensors;
@@ -81,17 +89,17 @@ public class Sector extends AbstractObservable implements Observer {
     }
 
     /**
-     * Recomputes the sector occupancy and updates the panel accordingly:
-     * escalates to {@link PanelMode#ALERT} above the threshold, de-escalates to
-     * standby below it. Safe to call at any time (e.g. right after building the
-     * sector to reflect the initial occupancy).
+     * Recomputes the sector's crowd movement and updates the panel accordingly:
+     * escalates to {@link PanelMode#ALERT} when too many spectators are out of
+     * their seats at once (real congestion), de-escalates to standby when it
+     * clears. Safe to call at any time (e.g. right after building the sector).
      */
     public void refresh() {
         if (panel == null) {
             return;
         }
-        double ratio = computeOccupancyRatio();
-        if (ratio >= congestionThreshold) {
+        double movement = computeMovementRatio();
+        if (movement >= congestionThreshold) {
             if (panel.getMode() != PanelMode.ALERT) {
                 panel.broadcast(PanelMessage.alert("ZONE DENSE \u2014 RALENTISSEZ"));
                 notifyObservers(new SimulationEvent(
@@ -100,6 +108,23 @@ public class Sector extends AbstractObservable implements Observer {
         } else if (panel.getMode() == PanelMode.ALERT) {
             panel.reset();
         }
+    }
+
+    /**
+     * Fraction of the sector's spectators currently away from their seat (up and
+     * moving in the aisles). Near 0 for a calm, seated audience; it rises only
+     * when many people move at once, which is the real congestion signal.
+     *
+     * @return a value in {@code [0, 1]} (0 if the sector has no seat)
+     */
+    public double computeMovementRatio() {
+        int seats = 0;
+        int away = 0;
+        for (RowSensor sensor : rowSensors) {
+            seats += sensor.seatCount();
+            away += sensor.awayCount();
+        }
+        return seats == 0 ? 0.0 : (double) away / seats;
     }
 
     /**
@@ -166,7 +191,7 @@ public class Sector extends AbstractObservable implements Observer {
     /**
      * Sets the congestion threshold, clamped to {@code [0, 1]}.
      *
-     * @param threshold the occupancy ratio above which an alert is raised
+     * @param threshold the movement ratio above which an alert is raised
      */
     public void setCongestionThreshold(double threshold) {
         this.congestionThreshold = Math.max(0.0, Math.min(1.0, threshold));

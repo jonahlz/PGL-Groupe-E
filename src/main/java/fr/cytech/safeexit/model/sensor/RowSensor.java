@@ -73,6 +73,22 @@ public class RowSensor extends AbstractObservable implements Observer {
     }
 
     /**
+     * Counts the seats whose occupant has temporarily left (status
+     * {@link SeatStatus#AWAY}): spectators currently up and moving in the aisles.
+     *
+     * @return the number of seats currently marked away
+     */
+    public int awayCount() {
+        int n = 0;
+        for (SeatSensor s : seatSensors) {
+            if (s.getStatus() == SeatStatus.AWAY) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
      * Returns the occupancy ratio of the row, in {@code [0, 1]}.
      *
      * @return occupied seats divided by total seats (0 if the row is empty)

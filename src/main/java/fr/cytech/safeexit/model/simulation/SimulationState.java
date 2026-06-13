@@ -5,6 +5,7 @@ import fr.cytech.safeexit.model.graph.Graph;
 import fr.cytech.safeexit.model.graph.Node;
 import fr.cytech.safeexit.model.sensor.SensorNetwork;
 import fr.cytech.safeexit.model.sector.SectorManager;
+import fr.cytech.safeexit.model.tracking.AgentTracker;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -45,6 +46,9 @@ public class SimulationState implements Serializable {
 
     /** Optional sector / display-panel layer built on top of the sensors (may be {@code null}). */
     private SectorManager sectorManager;
+
+    /** Movement-history tracker; always initialised, attached as an observer by the engine. */
+    private final AgentTracker agentTracker = new AgentTracker();
 
     /** Number of simulation cycles elapsed since the start. */
     private long currentCycle;
@@ -154,6 +158,15 @@ public class SimulationState implements Serializable {
      */
     public void setSectorManager(SectorManager sectorManager) {
         this.sectorManager = sectorManager;
+    }
+
+    /**
+     * Returns the movement-history tracker (never {@code null}).
+     *
+     * @return the agent tracker
+     */
+    public AgentTracker getAgentTracker() {
+        return agentTracker;
     }
 
     /**
